@@ -1,0 +1,185 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class GenerateGalaxy : MonoBehaviour {
+
+	public bool TestStartGenerate;
+	public bool SpiralGalaxy;
+	public bool StarHeightEnable = true;
+	public bool DynamicStarHeight = true;
+	public bool SmoothDynamicHeight = true;
+	private bool Generate; // Whether to generate
+
+	public long MaxTotalStars; // Limit how much stars should be added, if at 0, then no limit. This could rather be set to maximum negative value to maximise total storage amount, same can be with other values
+	public long TotalStars; // Should be how much stars were recorded
+
+	public long MaxStarsPerTask = 2; // How much random stars to generate within the line, perhaps before rotating
+	public int MaxRotationAmount = 360; // How much perhaps to rotate around
+
+	public int RotationAmount = 1; // how much to add to rotation.
+	private int CurrentRotationAngle; // Generate according to this angle. This should be the current angle.
+	public float MinDistance = 100; // Can be minumum starting point to generate within
+	public float MaxDistance = 500; // Can be how far to generate within
+	private float CurrentDistance;
+	private long CurrentStarsPerTask; // Make this equal max value and then subtract for each star as a task, then when 0, start as such
+
+	public int HeightDifferenceA = -50; // Opposite value to corresponding counterpart, does not need to be negative but can be opposite
+	public int HeightDifferenceB = 50; // ^
+
+
+	public bool RecordInfo; // Whether to copy to list.
+	public List<float> StarPivotAngle; // Angle to pivot when added. Be careful when viewing these Lists in inspector if there's a high amount of stars. I made these Lists so that these can be seen as a reference if wanting to store each stars values
+	public List<float> StarPivotDistance; // Distance of star to pivot;
+	public List<float> StarHeight; // The stars height. Could imagine this on plane, say, at 0 height. Values can determine if above or below plane as such.
+
+	private float StarHeightBasic; // Variant that is not a list
+
+
+
+	public Transform RotatePivot; 		// The point that rotates. The objects are not needed, this method can be achieved without using objects
+	public GameObject PivotDistance;	// The point that can change distance under the pivot
+	public GameObject RootObject;		// What object to instantiate under. Any object under this would most likely be deleted if to start generation.
+	public GameObject StarPrefab;		// Star prefab to instantiate
+
+	private float CurrentSpiralValue;
+	private float CurrentDynamicHeight;
+	private bool DynamicSmoothDirection;
+
+	void FixedUpdate () {
+		
+		if (Generate == true) {
+			if (CurrentRotationAngle < MaxRotationAmount) { 		// if less, then continue, otherwise then should not
+				if (CurrentStarsPerTask <= 0) { 			// If less or at 0 then should reset CurrentStarsPerTask and modify the current rotation angle. (rotation angle could be negative or positive, etc)
+					CurrentStarsPerTask = MaxStarsPerTask;
+					CurrentRotationAngle += RotationAmount;
+				}
+
+				if (CurrentStarsPerTask != 0) {			// if not at 0, perhaps a negative and or positive, etc
+					
+					if (StarHeightEnable == true) { 		// If StarHeight is enabled
+
+						if (DynamicStarHeight == false) {
+							if (RecordInfo == true) {
+								StarHeight.Add (Random.Range (HeightDifferenceA, HeightDifferenceB)); 
+							} else {
+								StarHeightBasic = Random.Range (HeightDifferenceA, HeightDifferenceB);
+							}
+						}
+
+						if (DynamicStarHeight == true) { 	// This usually makes the galaxy shape more less uniform
+							if (SmoothDynamicHeight == false) {			
+								CurrentDynamicHeight += RotationAmount;
+								if (CurrentDynamicHeight >= HeightDifferenceB) {
+									CurrentDynamicHeight = HeightDifferenceA;
+								}
+							}
+
+							if (SmoothDynamicHeight == true) { 			// Smooth dynamic height, well, at least somewhat. Height may not look 'connected' when finished rotating
+								if (DynamicSmoothDirection == false) { 	// Control direction height is around, so add or subtract if true or false
+									CurrentDynamicHeight += RotationAmount;
+									if (CurrentDynamicHeight >= HeightDifferenceB) {
+										DynamicSmoothDirection = true;
+									}
+								}
+
+								if (DynamicSmoothDirection == true) {
+									CurrentDynamicHeight -= RotationAmount;
+									if (CurrentDynamicHeight <= HeightDifferenceA) {
+										DynamicSmoothDirection = false;
+									}
+								}
+							}
+							if (RecordInfo == true) {
+								StarHeight.Add (Random.Range (CurrentDynamicHeight - HeightDifferenceA, CurrentDynamicHeight)); // if StarHeight 
+							} else {
+								StarHeightBasic = Random.Range (CurrentDynamicHeight - HeightDifferenceA, CurrentDynamicHeight);
+							}
+						}
+
+					}
+
+
+
+					if (SpiralGalaxy == false) {
+						CurrentDistance = Random.Range (MinDistance, MaxDistance);
+					}
+
+					if (SpiralGalaxy == true) {
+						CurrentSpiralValue += RotationAmount;
+						if (CurrentSpiralValue >= MaxDistance) {
+							CurrentSpiralValue = MinDistance;
+						}
+						CurrentDistance = Random.Range (CurrentSpiralValue - MinDistance, CurrentSpiralValue);
+					}
+
+					if (RecordInfo == true) {
+						StarPivotAngle.Add (CurrentRotationAngle);
+						StarPivotDistance.Add (CurrentDistance);
+					}
+
+					CurrentStarsPerTask -= 1; 	// subtract from current task
+					TotalStars += 1; 	// add up total amount
+
+				}
+
+
+			}
+
+			RotatePivot.transform.localEulerAngles = new Vector3 (0, 0, CurrentRotationAngle); 		// This should rotate according to rotation angle
+			PivotDistance.transform.localPosition = new Vector2 (0, CurrentDistance); 	// Set distance from pivot, so perhaps for each 'task', set this to random position
+
+			GameObject Star = Instantiate (StarPrefab); // Does not need to make objects, but this can be a reference
+
+			Star.transform.SetParent(RootObject.transform);
+
+			if (StarHeightEnable == true){
+				
+				if(RecordInfo == true){
+					Star.transform.position = new Vector3(PivotDistance.transform.position.x,PivotDistance.transform.position.y,PivotDistance.transform.position.z + StarHeight[StarHeight.Count -1]); // Set to last value of List
+				}
+				if (RecordInfo == false) {
+					Star.transform.position = new Vector3(PivotDistance.transform.position.x,PivotDistance.transform.position.y,PivotDistance.transform.position.z + StarHeightBasic);
+				}
+
+			}
+
+			if (StarHeightEnable == false){
+				Star.transform.position = PivotDistance.transform.position; // was, 
+			}
+
+			if (MaxTotalStars != 0) {
+				if (TotalStars >= MaxTotalStars) {
+					Generate = false;
+					Debug.Log ("Finished Galaxy Generation");
+				}
+			} 
+
+			if (CurrentRotationAngle >= MaxRotationAmount) {
+				Generate = false;
+				Debug.Log ("Finished Galaxy Generation");
+			}
+
+
+		}
+
+		if(TestStartGenerate == true){ // If wanting to use this method instead directly from a function, this is a reference that is not necessarily needed
+			StartGenerate();
+			TestStartGenerate = false;
+		}
+
+	}
+
+	public void StartGenerate(){ // Clear values before generation
+		foreach (Transform child in RootObject.transform) {
+			GameObject.Destroy (child.gameObject);
+		}
+		StarHeight.Clear ();
+		StarPivotAngle.Clear ();
+		StarPivotDistance.Clear ();
+		CurrentSpiralValue = 0;
+		TotalStars = 0;
+		CurrentRotationAngle = -RotationAmount; // If not set to opposite value, say, if 360 degrees; may not rotate correctly
+		Generate = true;
+	}
+}
